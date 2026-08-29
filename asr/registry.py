@@ -87,9 +87,11 @@ def _qwen_probe() -> tuple[str, str]:
         return "installed", f"Embedded runtime available in {Path(sys.executable).name}"
     if configured_python and Path(configured_python).is_file():
         return "installed", "Configured isolated Qwen ASR runtime"
+    from config.environment import venv_python as _venv_python
+
     for candidate in (
-        _PROJECT_ROOT / ".venv_cu124" / "Scripts" / "python.exe",
-        _PROJECT_ROOT / ".venv_asr" / "Scripts" / "python.exe",
+        _venv_python(_PROJECT_ROOT, ".venv_cu124"),
+        _venv_python(_PROJECT_ROOT, ".venv_asr"),
     ):
         if candidate.is_file():
             return "installed", f"Isolated runtime found at {candidate.parent.parent.name}"
