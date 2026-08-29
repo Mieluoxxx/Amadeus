@@ -263,6 +263,7 @@ function AmadeusApp() {
       <Sidebar
         page={page} onNavigate={handleNavigate}
         renderActive={renderActive} wallpaperActive={wallpaperActive}
+        wallpaperSupported={window.amadeus?.platform === 'win32'}
         onToggleRender={handleToggleRender} onToggleWallpaper={handleToggleWallpaper}
       />
       <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg)' }}>

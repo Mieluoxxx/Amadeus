@@ -7,6 +7,7 @@ interface Props {
   onNavigate: (p: Page) => void
   renderActive: boolean
   wallpaperActive: boolean
+  wallpaperSupported: boolean
   onToggleRender: () => void
   onToggleWallpaper: () => void
 }
@@ -14,7 +15,7 @@ interface Props {
 type NavItem =
   | { kind: 'page'; page: Page; label: string; icon: 'Edit' | 'Setting' | 'CommandPrompt' | 'Movie' }
   | { kind: 'toggle'; label: string; icon: 'Video'; iconActive: 'Movie'; active: boolean; onClick: () => void }
-  | { kind: 'toggle-simple'; label: string; icon: 'Tiles'; active: boolean; onClick: () => void }
+  | { kind: 'toggle-simple'; label: string; icon: 'Tiles'; active: boolean; onClick: () => void; disabled?: boolean; disabledHint?: string }
 
 function navButtonStyle(active: boolean, collapsed: boolean): CSSProperties {
   return {
@@ -34,7 +35,7 @@ function CollapseGlyph({ collapsed }: { collapsed: boolean }) {
 
 export default function Sidebar({
   page, onNavigate,
-  renderActive, wallpaperActive, onToggleRender, onToggleWallpaper,
+  renderActive, wallpaperActive, wallpaperSupported, onToggleRender, onToggleWallpaper,
 }: Props) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('amadeus.sidebar.collapsed') === '1')
 
@@ -60,6 +61,8 @@ export default function Sidebar({
       icon: 'Tiles',
       active: wallpaperActive,
       onClick: onToggleWallpaper,
+      disabled: !wallpaperSupported,
+      disabledHint: 'Wallpaper mode requires Windows',
     },
     { kind: 'page', page: 'vn', label: 'VN Player', icon: 'Movie' },
   ]
@@ -100,14 +103,16 @@ export default function Sidebar({
     }
     // toggle items — selectable=false, show active state
     const iconName = item.kind === 'toggle' && item.active ? item.iconActive : item.icon
+    const disabled = item.kind === 'toggle-simple' && item.disabled
     return (
       <button
         key={item.label}
-        onClick={item.onClick}
-        title={collapsed ? item.label : undefined}
+        onClick={disabled ? undefined : item.onClick}
+        disabled={disabled}
+        title={disabled ? (item.disabledHint ?? item.label) : (collapsed ? item.label : undefined)}
         className="flex items-center gap-3 w-full text-left text-[13px]
                    transition-colors duration-150"
-        style={navButtonStyle(item.active, collapsed)}
+        style={disabled ? { ...navButtonStyle(false, collapsed), opacity: 0.4, cursor: 'not-allowed' } : navButtonStyle(item.active, collapsed)}
         onMouseEnter={e => {
           if (!item.active) {
             (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--hover)'

@@ -27,6 +27,7 @@ export declare global {
   }
 
   interface AmadeusAPI {
+    platform: string
     getBackendConnection: () => Promise<{
       url: string
       protocols: string[]

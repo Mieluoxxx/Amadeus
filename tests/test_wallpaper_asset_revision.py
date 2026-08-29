@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -188,6 +189,12 @@ def test_shared_canvas_and_slice_host_are_javascript_syntax_valid() -> None:
         )
 
 
+import pytest
+
+requires_windows = pytest.mark.skipif(os.name != "nt", reason="wallpaper mode is Windows-only")
+
+
+@requires_windows
 def test_electron_wallpaper_start_selects_the_external_slice_host(monkeypatch) -> None:
     created: list[object] = []
 
@@ -243,6 +250,7 @@ def test_electron_wallpaper_start_selects_the_external_slice_host(monkeypatch) -
     asyncio.run(handler._stop({}))
 
 
+@requires_windows
 def test_wallpaper_host_starts_without_the_optional_character_pack(tmp_path, monkeypatch) -> None:
     class Host:
         asset_port = 17778

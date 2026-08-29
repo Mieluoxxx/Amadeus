@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any
 from collections.abc import Callable
 from pathlib import Path
@@ -90,6 +91,14 @@ class WallpaperHandler(RequestHandler):
         """
         if self._wallpaper_host is not None:
             return self._status("already_running")
+
+        if os.name != "nt":
+            return {
+                "ok": False,
+                "error": "wallpaper_unsupported_platform",
+                "detail": "Wallpaper mode requires Windows (Lively/Wallpaper Engine host). "
+                "Chat, Work, and headless rendering are unaffected.",
+            }
 
         try:
             from wallpaper.wallpaper_engine_bridge import WallpaperEngineBridgeHost

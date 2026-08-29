@@ -47,16 +47,17 @@ class _MSLLHOOKSTRUCT(ctypes.Structure):
     ]
 
 
-_HOOK_PROC = ctypes.WINFUNCTYPE(
-    ctypes.c_ssize_t, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM
-)
-
-
 class PointerWheelForwarder:
     """Global wheel hook that publishes deltas through a callback."""
 
     def __init__(self, publish: Callable[[float, float], None]):
         self._publish = publish
+        # WINFUNCTYPE exists only on Windows; create it here instead of at
+        # module scope so importing this module stays safe on other platforms.
+        hook_proc = ctypes.WINFUNCTYPE(
+            ctypes.c_ssize_t, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM
+        )
+        self._hook_proc_type = hook_proc
         # Private instance: shared ctypes.windll caches prototypes globally,
         # and every argtype here matters -- on x64 the default int conversion
         # truncates LPARAM/HHOOK and raises OverflowError inside the hook.
@@ -64,7 +65,7 @@ class PointerWheelForwarder:
         u = self._user32
         u.SetWindowsHookExW.restype = ctypes.c_void_p
         u.SetWindowsHookExW.argtypes = [
-            ctypes.c_int, _HOOK_PROC, wintypes.HINSTANCE, wintypes.DWORD,
+            ctypes.c_int, hook_proc, wintypes.HINSTANCE, wintypes.DWORD,
         ]
         u.UnhookWindowsHookEx.restype = wintypes.BOOL
         u.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
@@ -154,7 +155,7 @@ class PointerWheelForwarder:
     def _run_hook(self):
         kernel32 = ctypes.windll.kernel32
         self._hook_thread_id = kernel32.GetCurrentThreadId()
-        self._hook_proc = _HOOK_PROC(self._on_mouse)
+        self._hook_proc = self._hook_proc_type(self._on_mouse)
         self._hook = self._user32.SetWindowsHookExW(_WH_MOUSE_LL, self._hook_proc, None, 0)
         if not self._hook:
             logger.warning(
