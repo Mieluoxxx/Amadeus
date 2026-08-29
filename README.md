@@ -122,6 +122,9 @@ placeholder，本版本不声称已经发布独立 SDK 或 conformance suite。
 DeepSeek 主 Chat、本地 Qwen/SenseVoice 和 GPT-SoVITS v3。llama.cpp 是可选
 本地 LLM profile，不是首发安装前提。
 
+跨平台梯级安装（core / voice / local-cu124）见 `tools/setup.py`；
+macOS 部署见 [docs/macos.md](docs/macos.md)（社区支持状态）。
+
 ### 参考硬件
 
 - Windows 11
