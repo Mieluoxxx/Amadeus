@@ -92,22 +92,29 @@ class WallpaperHandler(RequestHandler):
         if self._wallpaper_host is not None:
             return self._status("already_running")
 
-        if os.name != "nt":
+        requested_slice_host = str(
+            params.get("slice_host") or params.get("sliceHost") or "wallpaper"
+        ).strip().lower()
+        slice_host = "electron" if requested_slice_host == "electron" else "wallpaper"
+        requested_mode = str(params.get("mode") or "").strip().lower()
+        browser_preview = requested_mode == "browser"
+
+        # External desktop hosts (Lively / Wallpaper Engine) are Windows-only.
+        # The in-app electron slice and browser preview stay cross-platform.
+        if slice_host == "wallpaper" and not browser_preview and os.name != "nt":
             return {
                 "ok": False,
                 "error": "wallpaper_unsupported_platform",
-                "detail": "Wallpaper mode requires Windows (Lively/Wallpaper Engine host). "
-                "Chat, Work, and headless rendering are unaffected.",
+                "suggestion": "browser",
+                "detail": "Desktop wallpaper embedding requires Windows "
+                "(Lively/Wallpaper Engine host). Use browser preview instead: "
+                "wallpaper.start with mode=browser.",
             }
 
         try:
             from wallpaper.wallpaper_engine_bridge import WallpaperEngineBridgeHost
             from render.spriteforge_animator import SpriteForgeAnimator
 
-            requested_slice_host = str(
-                params.get("slice_host") or params.get("sliceHost") or "wallpaper"
-            ).strip().lower()
-            slice_host = "electron" if requested_slice_host == "electron" else "wallpaper"
             self._wallpaper_host = WallpaperEngineBridgeHost(slice_host=slice_host)
             self._install_canvas_action_handler(self._wallpaper_host)
             self._wallpaper_host.start()
@@ -124,6 +131,12 @@ class WallpaperHandler(RequestHandler):
             self._wallpaper_animator = SpriteForgeAnimator(self._wallpaper_host)
             self._wallpaper_animator.start()
             payload = self._status("started")
+            if browser_preview:
+                import webbrowser
+
+                webbrowser.open(self._wallpaper_host.url, new=2, autoraise=True)
+                payload["mode"] = "browser"
+                payload["url"] = self._wallpaper_host.url
             await bus.emit(Method.WALLPAPER_READY, payload)
             if WAKE_ENABLED and WAKE_AUTO_START_WITH_WALLPAPER and self._wake_start_fn:
                 try:

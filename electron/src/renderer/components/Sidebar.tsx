@@ -10,12 +10,13 @@ interface Props {
   wallpaperSupported: boolean
   onToggleRender: () => void
   onToggleWallpaper: () => void
+  onTogglePreview: () => void
 }
 
 type NavItem =
   | { kind: 'page'; page: Page; label: string; icon: 'Edit' | 'Setting' | 'CommandPrompt' | 'Movie' }
   | { kind: 'toggle'; label: string; icon: 'Video'; iconActive: 'Movie'; active: boolean; onClick: () => void }
-  | { kind: 'toggle-simple'; label: string; icon: 'Tiles'; active: boolean; onClick: () => void; disabled?: boolean; disabledHint?: string }
+  | { kind: 'toggle-simple'; label: string; icon: 'Tiles' | 'Play'; active: boolean; onClick: () => void; disabled?: boolean; disabledHint?: string }
 
 function navButtonStyle(active: boolean, collapsed: boolean): CSSProperties {
   return {
@@ -35,7 +36,7 @@ function CollapseGlyph({ collapsed }: { collapsed: boolean }) {
 
 export default function Sidebar({
   page, onNavigate,
-  renderActive, wallpaperActive, wallpaperSupported, onToggleRender, onToggleWallpaper,
+  renderActive, wallpaperActive, wallpaperSupported, onToggleRender, onToggleWallpaper, onTogglePreview,
 }: Props) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('amadeus.sidebar.collapsed') === '1')
 
@@ -57,12 +58,19 @@ export default function Sidebar({
     },
     {
       kind: 'toggle-simple',
-      label: 'Wallpaper',
-      icon: 'Tiles',
+      label: 'Preview',
+      icon: 'Play',
       active: wallpaperActive,
+      onClick: onTogglePreview,
+    },
+    {
+      kind: 'toggle-simple',
+      label: 'Desktop',
+      icon: 'Tiles',
+      active: false,
       onClick: onToggleWallpaper,
       disabled: !wallpaperSupported,
-      disabledHint: 'Wallpaper mode requires Windows',
+      disabledHint: 'Desktop wallpaper mode requires Windows',
     },
     { kind: 'page', page: 'vn', label: 'VN Player', icon: 'Movie' },
   ]

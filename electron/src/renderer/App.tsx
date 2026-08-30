@@ -8,7 +8,7 @@ import SettingsPage from './components/SettingsPage'
 import BackendPage from './components/BackendPage'
 import VNPage from './components/VNPage'
 import WorkPreviewPage from './components/WorkPreviewPage'
-import { ELECTRON_SLICE_START_PARAMS, syncElectronSliceHost } from './wallpaperSlice'
+import { syncElectronSliceHost } from './wallpaperSlice'
 
 export type Page = 'chat' | 'vn' | 'backend' | 'expressions' | 'settings'
 
@@ -100,6 +100,24 @@ function AmadeusApp() {
     }
   }, [send, renderActive, wallpaperActive])
 
+  // Browser preview: start the wallpaper bridge and open the scene in the
+  // default browser. Cross-platform; the desktop host is not involved.
+  const handleTogglePreview = useCallback(async () => {
+    const next = !wallpaperActive
+    setPage('chat')
+    if (next) {
+      try {
+        const res = await send('wallpaper.start', { mode: 'browser' })
+        setWallpaperActive(res?.status !== 'error' && res?.ok !== false)
+      } catch {
+        setWallpaperActive(false)
+      }
+    } else {
+      try { await send('wallpaper.stop', {}) } catch {}
+      setWallpaperActive(false)
+    }
+  }, [wallpaperActive, send])
+
   // Toggle the Electron Slice wallpaper projection.
   const handleToggleWallpaper = useCallback(async () => {
     const next = !wallpaperActive
@@ -113,9 +131,8 @@ function AmadeusApp() {
         setRenderAssetUrl('')
       }
       try {
-        const res = await send('wallpaper.start', ELECTRON_SLICE_START_PARAMS)
-        setWallpaperActive(res?.status !== 'error')
-        if (res?.status !== 'error') await syncElectronSliceHost(res)
+        const res = await send('wallpaper.start', { mode: 'desktop' })
+        setWallpaperActive(res?.status !== 'error' && res?.ok !== false)
       } catch {
         setWallpaperActive(false)
       }
@@ -265,6 +282,7 @@ function AmadeusApp() {
         renderActive={renderActive} wallpaperActive={wallpaperActive}
         wallpaperSupported={window.amadeus?.platform === 'win32'}
         onToggleRender={handleToggleRender} onToggleWallpaper={handleToggleWallpaper}
+        onTogglePreview={handleTogglePreview}
       />
       <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg)' }}>
         {page === 'chat' && <ChatPage send={send} subscribe={subscribe} connected={connected} renderActive={renderActive} renderAssetUrl={renderAssetUrl} />}
