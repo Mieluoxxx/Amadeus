@@ -82,20 +82,34 @@ def _remote_factory() -> BaseASRBackend:
 
 
 def _qwen_probe() -> tuple[str, str]:
-    configured_python = str(os.environ.get("QWEN3_ASR_PYTHON") or "").strip()
-    if importlib.util.find_spec("qwen_asr") is not None:
-        return "installed", f"Embedded runtime available in {Path(sys.executable).name}"
-    if configured_python and Path(configured_python).is_file():
-        return "installed", "Configured isolated Qwen ASR runtime"
-    from config.environment import venv_python as _venv_python
+    from asr.qwen_model import qwen_model_status
 
-    for candidate in (
-        _venv_python(_PROJECT_ROOT, ".venv_cu124"),
-        _venv_python(_PROJECT_ROOT, ".venv_asr"),
-    ):
-        if candidate.is_file():
-            return "installed", f"Isolated runtime found at {candidate.parent.parent.name}"
-    return "not_installed", "Qwen ASR runtime is not installed"
+    configured_python = str(os.environ.get("QWEN3_ASR_PYTHON") or "").strip()
+    runtime_available = False
+    runtime_detail = ""
+    if importlib.util.find_spec("qwen_asr") is not None:
+        runtime_available = True
+        runtime_detail = f"embedded runtime in {Path(sys.executable).name}"
+    elif configured_python and Path(configured_python).is_file():
+        runtime_available = True
+        runtime_detail = "configured isolated runtime"
+    else:
+        from config.environment import venv_python as _venv_python
+
+        for candidate in (
+            _venv_python(_PROJECT_ROOT, ".venv_cu124"),
+            _venv_python(_PROJECT_ROOT, ".venv_asr"),
+        ):
+            if candidate.is_file():
+                runtime_available = True
+                runtime_detail = f"isolated runtime at {candidate.parent.parent.name}"
+                break
+    if not runtime_available:
+        return "not_installed", "Qwen ASR runtime is not installed"
+    model_ready, model_detail, _ = qwen_model_status()
+    if not model_ready:
+        return "not_installed", model_detail
+    return "installed", f"{model_detail}; {runtime_detail}"
 
 
 def _sense_voice_probe() -> tuple[str, str]:

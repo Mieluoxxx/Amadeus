@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
+import wave
 
 import httpx
 import numpy as np
@@ -12,7 +14,17 @@ import pytest
 from tts.backend import TTSSynthesisRequest, TTSBackendError
 from tts.backends.mimo import MiMoTTSBackend, _chat_endpoint
 from tts.registry import tts_backend_ids, tts_backend_statuses
-from tests.test_voice_backend_registry import _wav_bytes
+
+
+def _wav_bytes(*, sample_rate: int = 24000) -> bytes:
+    output = io.BytesIO()
+    samples = (np.asarray([0.0, 0.25, -0.25], dtype=np.float32) * 32767).astype("<i2")
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(samples.tobytes())
+    return output.getvalue()
 
 
 def _backend(**overrides) -> MiMoTTSBackend:
@@ -50,7 +62,10 @@ def _fake_stream(lines, observed):
 
         @staticmethod
         def iter_lines():
-            yield from lines
+            for line in lines:
+                if line == "data: [DONE]":
+                    observed["saw_done"] = True
+                yield line
 
     def fake_stream(method, url, **kwargs):
         observed.update(method=method, url=url, **kwargs)
@@ -78,6 +93,11 @@ def test_chat_endpoint_normalization() -> None:
 def test_load_requires_api_key() -> None:
     with pytest.raises(TTSBackendError, match="MIMO_TTS_API_KEY"):
         _backend(api_key="").load()
+
+
+def test_load_rejects_unsupported_mimo_variants() -> None:
+    with pytest.raises(TTSBackendError, match="unsupported MIMO_TTS_MODEL"):
+        _backend(model="mimo-v2.5-tts-voiceclone").load()
 
 
 def test_payload_uses_assistant_message_and_pcm16_stream() -> None:
@@ -109,7 +129,7 @@ def test_buffered_synthesize_decodes_message_audio(monkeypatch) -> None:
     chunk = _backend().synthesize(TTSSynthesisRequest("Hello"))
 
     assert observed["url"] == "https://api.xiaomimimo.com/v1/chat/completions"
-    assert observed["headers"]["api-key"] == "secret"
+    assert observed["headers"]["Authorization"] == "Bearer secret"
     assert chunk.sample_rate == 24000
     assert chunk.audio.dtype == np.float32
     assert chunk.text == "Hello"
@@ -139,12 +159,16 @@ def test_stream_yields_pcm_chunks_and_skips_empty_choices(monkeypatch) -> None:
     observed: dict = {}
     monkeypatch.setattr(httpx, "stream", _fake_stream(lines, observed))
 
-    chunks = list(_backend().synthesize_stream(TTSSynthesisRequest("Hello")))
+    stream = _backend().synthesize_stream(TTSSynthesisRequest("Hello"))
+    first_chunk = next(stream)
 
     assert observed["headers"]["Accept"] == "text/event-stream"
     assert observed["json"]["stream"] is True
     assert observed["json"]["audio"]["format"] == "pcm16"
+    assert observed.get("saw_done") is None
+    chunks = [first_chunk, *stream]
     assert observed["closed"] is True
+    assert observed["saw_done"] is True
     assert all(chunk.sample_rate == 24000 for chunk in chunks)
     assert chunks[0].text == "Hello"
     assert all(chunk.text == "" for chunk in chunks[1:])
@@ -164,4 +188,30 @@ def test_stream_without_audio_raises(monkeypatch) -> None:
     lines = _sse_lines([{"choices": [{"delta": {"role": "assistant"}}]}])
     monkeypatch.setattr(httpx, "stream", _fake_stream(lines, observed))
     with pytest.raises(TTSBackendError, match="without audio"):
+        list(_backend().synthesize_stream(TTSSynthesisRequest("Hello")))
+
+
+def test_stream_surfaces_provider_errors(monkeypatch) -> None:
+    observed: dict = {}
+    lines = _sse_lines([{"error": {"message": "quota exceeded"}}])
+    monkeypatch.setattr(httpx, "stream", _fake_stream(lines, observed))
+    post_calls = 0
+
+    def forbidden_post(*_args, **_kwargs):
+        nonlocal post_calls
+        post_calls += 1
+        raise AssertionError("a streaming failure must not create a second billable request")
+
+    monkeypatch.setattr(httpx, "post", forbidden_post)
+    with pytest.raises(TTSBackendError, match="quota exceeded"):
+        list(_backend().synthesize_stream(TTSSynthesisRequest("Hello")))
+    assert post_calls == 0
+
+
+def test_stream_rejects_an_incomplete_pcm_sample(monkeypatch) -> None:
+    observed: dict = {}
+    odd_pcm = base64.b64encode(b"\x01").decode()
+    lines = _sse_lines([{"choices": [{"delta": {"audio": {"data": odd_pcm}}}]}])
+    monkeypatch.setattr(httpx, "stream", _fake_stream(lines, observed))
+    with pytest.raises(TTSBackendError, match="incomplete PCM16"):
         list(_backend().synthesize_stream(TTSSynthesisRequest("Hello")))

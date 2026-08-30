@@ -280,7 +280,7 @@ TTS_API_TIMEOUT_SECONDS = _float("TTS_API_TIMEOUT_SECONDS", 60.0)
 MIMO_TTS_BASE_URL = _str("MIMO_TTS_BASE_URL", "https://api.xiaomimimo.com/v1")
 MIMO_TTS_API_KEY = _secret("MIMO_TTS_API_KEY", "")
 MIMO_TTS_MODEL = _str("MIMO_TTS_MODEL", "mimo-v2.5-tts")
-MIMO_TTS_VOICE = _str("MIMO_TTS_VOICE", "mimo_default")
+MIMO_TTS_VOICE = _str("MIMO_TTS_VOICE", "冰糖")
 
 
 def _resolve_tts_device() -> str:
@@ -367,6 +367,7 @@ VAD_ENERGY_THRESHOLD = _int("VAD_ENERGY_THRESHOLD", 600)
 # may run alongside this backend on the shared microphone service.
 ASR_BACKEND = _str("ASR_BACKEND", "qwen3_asr")
 ASR_LANGUAGE = _str("ASR_LANGUAGE", "auto")
+QWEN3_ASR_MODEL_PATH = _str("QWEN3_ASR_MODEL_PATH", "")
 QWEN3_ASR_DEVICE = _str("QWEN3_ASR_DEVICE", "auto").strip().lower()
 if QWEN3_ASR_DEVICE in {"cuda:0", "gpu"}:
     QWEN3_ASR_DEVICE = "cuda"
